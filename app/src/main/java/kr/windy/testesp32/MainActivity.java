@@ -1,33 +1,56 @@
 package kr.windy.testesp32;
 
+import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
 
-import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    public MainActivity() {
-        super();
-    }
+    private static final int PERMISSION_REQUEST_CODE = 100;
+    private static final String TAG = "ESP32";
+
+    private WifiManager wifiManager;
+    private ConnectivityManager cm;
+    private ListView listWifi;
+    private TextView tvStatus;
+    private List<ScanResult> scanResults = new ArrayList<>();
+    private BroadcastReceiver wifiScanReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -35,9 +58,119 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
-        // 1. ESP32 와이파이 자동 연결
+        listWifi = findViewById(R.id.listWifi);
+        tvStatus = findViewById(R.id.tvStatus);
+        Button btnScan = findViewById(R.id.btnScan);
+
+        btnScan.setOnClickListener(v -> checkPermissionAndScan());
+
+        listWifi.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < scanResults.size()) {
+                showPasswordDialog(scanResults.get(position));
+            }
+        });
+
+        wifiScanReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent intent) {
+                updateWifiList(wifiManager.getScanResults());
+            }
+        };
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(wifiScanReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(wifiScanReceiver);
+    }
+
+    private void checkPermissionAndScan() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSION_REQUEST_CODE);
+        } else {
+            startWifiScan();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE
+                && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startWifiScan();
+        } else {
+            tvStatus.setText("위치 권한이 필요합니다 (WiFi 스캔 요구사항)");
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void startWifiScan() {
+        tvStatus.setText("스캔 중...");
+        wifiManager.startScan();
+    }
+
+    private void updateWifiList(List<ScanResult> results) {
+        // SSID 중복 제거 (신호 강한 것 우선)
+        List<ScanResult> deduped = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        for (ScanResult r : results) {
+            if (r.SSID == null || r.SSID.isEmpty()) continue;
+            if (!seen.contains(r.SSID)) {
+                seen.add(r.SSID);
+                deduped.add(r);
+            }
+        }
+        scanResults = deduped;
+
+        List<String> items = new ArrayList<>();
+        for (ScanResult r : deduped) {
+            String security = r.capabilities.contains("WPA") ? "🔒" : "🔓";
+            items.add(security + " " + r.SSID + "  (" + r.level + " dBm)");
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_1, items);
+        listWifi.setAdapter(adapter);
+        tvStatus.setText("WiFi " + deduped.size() + "개 발견 — 전송할 네트워크를 선택하세요");
+    }
+
+    private void showPasswordDialog(ScanResult network) {
+        boolean isOpen = !network.capabilities.contains("WPA") && !network.capabilities.contains("WEP");
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(network.SSID);
+
+        EditText input = new EditText(this);
+        input.setHint(isOpen ? "비밀번호 없음 (오픈 네트워크)" : "WiFi 비밀번호 입력");
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        input.setPadding(padding, padding, padding, padding);
+        if (isOpen) input.setEnabled(false);
+        builder.setView(input);
+
+        builder.setPositiveButton("ESP32에 전송", (dialog, which) -> {
+            String password = isOpen ? "" : input.getText().toString();
+            connectAndSendToEsp32(network.SSID, password);
+        });
+        builder.setNegativeButton("취소", null);
+        builder.show();
+    }
+
+    private void connectAndSendToEsp32(String targetSsid, String targetPass) {
+        tvStatus.setText("ESP32 AP에 연결 중...");
+
         WifiNetworkSpecifier specifier = new WifiNetworkSpecifier.Builder()
                 .setSsid("ESP32-WIFI-SETUP")
                 .setWpa2Passphrase("12345678")
@@ -52,8 +185,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onAvailable(Network network) {
                 cm.bindProcessToNetwork(network);
+                runOnUiThread(() -> tvStatus.setText("ESP32 연결됨 — WiFi 정보 전송 중..."));
 
-                // 2. 192.168.4.1/save 로 와이파이 정보 전송
                 new Thread(() -> {
                     try {
                         URL url = new URL("http://192.168.4.1/save");
@@ -62,17 +195,25 @@ public class MainActivity extends AppCompatActivity {
                         conn.setDoOutput(true);
                         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-                        // ⚠️ 파라미터명 ssid, pass 로 고정!
-                        String body = "ssid=실제와이파이이름&pass=실제비밀번호";
+                        String body = "ssid=" + URLEncoder.encode(targetSsid, "UTF-8")
+                                + "&pass=" + URLEncoder.encode(targetPass, "UTF-8");
                         conn.getOutputStream().write(body.getBytes());
 
-                        int code = conn.getResponseCode(); // 200 오면 성공, 이후 ESP32 재부팅됨
-                        Log.d("ESP32", "응답: " + code);
+                        int code = conn.getResponseCode();
+                        Log.d(TAG, "응답: " + code);
                         conn.disconnect();
+
+                        runOnUiThread(() -> tvStatus.setText("전송 완료! (HTTP " + code + ") ESP32가 재부팅됩니다."));
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        Log.e(TAG, "전송 실패", e);
+                        runOnUiThread(() -> tvStatus.setText("전송 실패: " + e.getMessage()));
                     }
                 }).start();
+            }
+
+            @Override
+            public void onUnavailable() {
+                runOnUiThread(() -> tvStatus.setText("ESP32 AP 연결 실패 — SSID/비밀번호를 확인하세요"));
             }
         });
     }
