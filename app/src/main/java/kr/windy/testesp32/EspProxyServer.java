@@ -62,7 +62,7 @@ class EspProxyServer {
     }
 
     private void handle(Socket socket) {
-        try (socket) {
+        try {
             InputStream in = socket.getInputStream();
             OutputStream out = socket.getOutputStream();
 
@@ -163,6 +163,8 @@ class EspProxyServer {
 
         } catch (Exception e) {
             Log.e(TAG, "handle 실패", e);
+        } finally {
+            try { socket.close(); } catch (Exception ignored) {}
         }
     }
 
