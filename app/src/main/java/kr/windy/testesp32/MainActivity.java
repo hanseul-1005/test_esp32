@@ -41,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final String TAG = "ESP32";
+    private static final String SMART_SCALE_SSID = "SmartScale-Setup";
 
     private WifiManager wifiManager;
     private ConnectivityManager cm;
@@ -177,6 +178,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPasswordDialog(ScanResult network) {
+        if (SMART_SCALE_SSID.equals(network.SSID)) {
+            connectToSmartScaleAndOpenWebView(network);
+            return;
+        }
+
         boolean isOpen = !network.capabilities.contains("WPA") && !network.capabilities.contains("WEP");
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -196,6 +202,60 @@ public class MainActivity extends AppCompatActivity {
         });
         builder.setNegativeButton("취소", null);
         builder.show();
+    }
+
+    private void connectToSmartScaleAndOpenWebView(ScanResult network) {
+        boolean isOpen = !network.capabilities.contains("WPA") && !network.capabilities.contains("WEP");
+
+        if (isOpen) {
+            doConnectToSmartScale("");
+        } else {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(SMART_SCALE_SSID + " 연결");
+
+            EditText input = new EditText(this);
+            input.setHint("WiFi 비밀번호 입력");
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            int padding = (int) (16 * getResources().getDisplayMetrics().density);
+            input.setPadding(padding, padding, padding, padding);
+            builder.setView(input);
+
+            builder.setPositiveButton("연결", (dialog, which) ->
+                    doConnectToSmartScale(input.getText().toString()));
+            builder.setNegativeButton("취소", null);
+            builder.show();
+        }
+    }
+
+    private void doConnectToSmartScale(String password) {
+        tvStatus.setText("SmartScale-Setup에 연결 중...");
+
+        WifiNetworkSpecifier.Builder specifierBuilder = new WifiNetworkSpecifier.Builder()
+                .setSsid(SMART_SCALE_SSID);
+        if (!password.isEmpty()) {
+            specifierBuilder.setWpa2Passphrase(password);
+        }
+
+        NetworkRequest request = new NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .setNetworkSpecifier(specifierBuilder.build())
+                .build();
+
+        cm.requestNetwork(request, new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                cm.bindProcessToNetwork(network);
+                runOnUiThread(() -> {
+                    tvStatus.setText("연결됨 — 설정 페이지 열기...");
+                    startActivity(new Intent(MainActivity.this, WebViewActivity.class));
+                });
+            }
+
+            @Override
+            public void onUnavailable() {
+                runOnUiThread(() -> tvStatus.setText("SmartScale-Setup 연결 실패 — 비밀번호를 확인하세요"));
+            }
+        });
     }
 
     private void connectAndSendToEsp32(String targetSsid, String targetPass) {
