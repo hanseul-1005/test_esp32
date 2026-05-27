@@ -1,6 +1,7 @@
 package kr.windy.testesp32;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -76,6 +77,8 @@ public class MainActivity extends AppCompatActivity {
         wifiScanReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent intent) {
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED) return;
                 boolean success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false);
                 List<ScanResult> results = wifiManager.getScanResults();
                 if (results.isEmpty()) {
@@ -123,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @SuppressWarnings("deprecation")
+    @SuppressLint("MissingPermission")
     private void startWifiScan() {
         if (!wifiManager.isWifiEnabled()) {
             tvStatus.setText("WiFi가 꺼져 있습니다. WiFi를 켜주세요.");
