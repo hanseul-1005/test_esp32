@@ -76,7 +76,13 @@ public class MainActivity extends AppCompatActivity {
         wifiScanReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent intent) {
-                updateWifiList(wifiManager.getScanResults());
+                boolean success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false);
+                List<ScanResult> results = wifiManager.getScanResults();
+                if (results.isEmpty()) {
+                    tvStatus.setText(success ? "주변 WiFi를 찾을 수 없습니다" : "스캔 실패 — 위치 서비스가 켜져 있는지 확인하세요");
+                } else {
+                    updateWifiList(results);
+                }
             }
         };
     }
@@ -118,8 +124,28 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressWarnings("deprecation")
     private void startWifiScan() {
-        tvStatus.setText("스캔 중...");
-        wifiManager.startScan();
+        if (!wifiManager.isWifiEnabled()) {
+            tvStatus.setText("WiFi가 꺼져 있습니다. WiFi를 켜주세요.");
+            return;
+        }
+
+        // 캐시된 결과 먼저 즉시 표시
+        List<ScanResult> cached = wifiManager.getScanResults();
+        if (!cached.isEmpty()) {
+            updateWifiList(cached);
+        } else {
+            tvStatus.setText("스캔 중...");
+        }
+
+        boolean started = wifiManager.startScan();
+        if (!started) {
+            // 쓰로틀링 등으로 새 스캔 불가 시 캐시 결과만 표시
+            if (cached.isEmpty()) {
+                tvStatus.setText("스캔 실패 — 위치 서비스(GPS)가 켜져 있는지 확인하세요");
+            } else {
+                tvStatus.setText("WiFi " + scanResults.size() + "개 발견 (캐시된 결과) — 전송할 네트워크를 선택하세요");
+            }
+        }
     }
 
     private void updateWifiList(List<ScanResult> results) {
