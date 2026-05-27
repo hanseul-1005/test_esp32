@@ -69,6 +69,9 @@ public class MainActivity extends AppCompatActivity {
 
         btnScan.setOnClickListener(v -> checkPermissionAndScan());
 
+        // 앱 시작 시 자동 스캔
+        checkPermissionAndScan();
+
         listWifi.setOnItemClickListener((parent, view, position, id) -> {
             if (position < scanResults.size()) {
                 showPasswordDialog(scanResults.get(position));
@@ -154,17 +157,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateWifiList(List<ScanResult> results) {
-        // SSID 중복 제거 (신호 강한 것 우선)
+        // SSID 중복 제거
         List<ScanResult> deduped = new ArrayList<>();
         List<String> seen = new ArrayList<>();
+        ScanResult smartScale = null;
         for (ScanResult r : results) {
             if (r.SSID == null || r.SSID.isEmpty()) continue;
             if (!seen.contains(r.SSID)) {
                 seen.add(r.SSID);
                 deduped.add(r);
             }
+            if (SMART_SCALE_SSID.equals(r.SSID) && smartScale == null) {
+                smartScale = r;
+            }
         }
         scanResults = deduped;
+
+        // SmartScale-Setup 발견 시 자동 연결
+        if (smartScale != null) {
+            tvStatus.setText("SmartScale-Setup 발견 — 자동 연결 중...");
+            connectToSmartScaleAndOpenWebView(smartScale);
+            return;
+        }
 
         List<String> items = new ArrayList<>();
         for (ScanResult r : deduped) {
@@ -174,7 +188,7 @@ public class MainActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_list_item_1, items);
         listWifi.setAdapter(adapter);
-        tvStatus.setText("WiFi " + deduped.size() + "개 발견 — 전송할 네트워크를 선택하세요");
+        tvStatus.setText("SmartScale-Setup을 찾을 수 없습니다. 수동으로 선택하세요");
     }
 
     private void showPasswordDialog(ScanResult network) {
