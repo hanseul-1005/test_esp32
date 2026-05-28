@@ -71,10 +71,7 @@ public class MainActivity extends AppCompatActivity {
         btnScan.setOnClickListener(v -> checkPermissionAndScan());
 
         // 스캔에 잡히지 않을 때 직접 연결
-        findViewById(R.id.btnDirectConnect).setOnClickListener(v -> {
-            tvStatus.setText("SmartScale-Setup에 직접 연결 중...");
-            doConnectToSmartScale("");
-        });
+        findViewById(R.id.btnDirectConnect).setOnClickListener(v -> doConnectToSmartScale());
 
         // 앱 시작 시 자동 스캔
         checkPermissionAndScan();
@@ -226,40 +223,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void connectToSmartScaleAndOpenWebView(ScanResult network) {
-        boolean isOpen = !network.capabilities.contains("WPA") && !network.capabilities.contains("WEP");
-
-        if (isOpen) {
-            doConnectToSmartScale("");
-        } else {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle(SMART_SCALE_SSID + " 연결");
-
-            EditText input = new EditText(this);
-            input.setHint("WiFi 비밀번호 입력");
-            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-            int padding = (int) (16 * getResources().getDisplayMetrics().density);
-            input.setPadding(padding, padding, padding, padding);
-            builder.setView(input);
-
-            builder.setPositiveButton("연결", (dialog, which) ->
-                    doConnectToSmartScale(input.getText().toString()));
-            builder.setNegativeButton("취소", null);
-            builder.show();
-        }
+        doConnectToSmartScale();
     }
 
-    private void doConnectToSmartScale(String password) {
+    private void doConnectToSmartScale() {
         tvStatus.setText("SmartScale-Setup에 연결 중...");
 
-        WifiNetworkSpecifier.Builder specifierBuilder = new WifiNetworkSpecifier.Builder()
-                .setSsid(SMART_SCALE_SSID);
-        if (!password.isEmpty()) {
-            specifierBuilder.setWpa2Passphrase(password);
-        }
+        // 펌웨어 기준 오픈 네트워크 (비밀번호 없음)
+        WifiNetworkSpecifier specifier = new WifiNetworkSpecifier.Builder()
+                .setSsid(SMART_SCALE_SSID)
+                .build();
 
         NetworkRequest request = new NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .setNetworkSpecifier(specifierBuilder.build())
+                .setNetworkSpecifier(specifier)
                 .build();
 
         esp32Callback = new ConnectivityManager.NetworkCallback() {
