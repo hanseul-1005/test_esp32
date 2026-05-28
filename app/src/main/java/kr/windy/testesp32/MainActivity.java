@@ -260,8 +260,19 @@ public class MainActivity extends AppCompatActivity {
             public void onAvailable(Network network) {
                 cm.bindProcessToNetwork(network);
                 runOnUiThread(() -> {
-                    tvStatus.setText("연결됨 — 설정 페이지 열기...");
-                    startActivity(new Intent(MainActivity.this, WebViewActivity.class));
+                    tvStatus.setText("연결됨 — 설정 화면 열기...");
+
+                    // SmartScale-Setup 제외한 SSID 목록 전달
+                    ArrayList<String> ssidList = new ArrayList<>();
+                    for (ScanResult r : scanResults) {
+                        if (!SMART_SCALE_SSID.equals(r.SSID)) {
+                            ssidList.add(r.SSID);
+                        }
+                    }
+
+                    Intent intent = new Intent(MainActivity.this, ConfigActivity.class);
+                    intent.putStringArrayListExtra(ConfigActivity.EXTRA_SSID_LIST, ssidList);
+                    startActivity(intent);
                 });
             }
 
