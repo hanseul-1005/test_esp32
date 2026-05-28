@@ -1,5 +1,7 @@
 package kr.windy.testesp32;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
 import android.net.Network;
 import android.os.Bundle;
 import android.text.InputType;
@@ -33,7 +35,6 @@ public class ConfigActivity extends AppCompatActivity {
     private TextView tvConfigStatus;
     private Button btnSave;
     private ArrayList<String> ssidList = new ArrayList<>();
-    private Network esp32Network;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,8 +60,6 @@ public class ConfigActivity extends AppCompatActivity {
 
         ArrayList<String> received = getIntent().getStringArrayListExtra(EXTRA_SSID_LIST);
         if (received != null) ssidList = received;
-
-        esp32Network = getIntent().getParcelableExtra(EXTRA_NETWORK);
 
         findViewById(R.id.btnSelectSsid).setOnClickListener(v -> showSsidPicker());
 
@@ -109,9 +108,12 @@ public class ConfigActivity extends AppCompatActivity {
             try {
                 URL url = new URL("http://192.168.4.1/wifisave");
 
-                // Network.openConnection() 으로 ESP32 로컬 네트워크 강제 사용
-                HttpURLConnection conn = esp32Network != null
-                        ? (HttpURLConnection) esp32Network.openConnection(url)
+                // bindProcessToNetwork()로 바인딩된 네트워크를 실시간으로 가져와 사용
+                // (전달받은 Network 객체는 시간이 지나면 만료될 수 있음)
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                Network boundNetwork = cm.getBoundNetworkForProcess();
+                HttpURLConnection conn = boundNetwork != null
+                        ? (HttpURLConnection) boundNetwork.openConnection(url)
                         : (HttpURLConnection) url.openConnection();
 
                 conn.setRequestMethod("POST");
