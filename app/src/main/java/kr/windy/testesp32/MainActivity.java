@@ -49,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvStatus;
     private List<ScanResult> scanResults = new ArrayList<>();
     private BroadcastReceiver wifiScanReceiver;
+    private ConnectivityManager.NetworkCallback esp32Callback; // GC 방지용 강한 참조
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -255,7 +256,7 @@ public class MainActivity extends AppCompatActivity {
                 .setNetworkSpecifier(specifierBuilder.build())
                 .build();
 
-        cm.requestNetwork(request, new ConnectivityManager.NetworkCallback() {
+        esp32Callback = new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
                 cm.bindProcessToNetwork(network);
@@ -281,7 +282,8 @@ public class MainActivity extends AppCompatActivity {
             public void onUnavailable() {
                 runOnUiThread(() -> tvStatus.setText("SmartScale-Setup 연결 실패 — 비밀번호를 확인하세요"));
             }
-        });
+        };
+        cm.requestNetwork(request, esp32Callback);
     }
 
     private void connectAndSendToEsp32(String targetSsid, String targetPass) {
