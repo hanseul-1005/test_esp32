@@ -23,6 +23,14 @@
         android:layout_height="wrap_content"
         android:text="WiFi 목록 스캔" />
 
+    <Button
+        android:id="@+id/btnDirectConnect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="SmartScale-Setup 직접 연결"
+        android:backgroundTint="#607D8B"
+        android:textColor="#FFFFFF" />
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"

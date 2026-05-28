@@ -70,6 +70,12 @@ public class MainActivity extends AppCompatActivity {
 
         btnScan.setOnClickListener(v -> checkPermissionAndScan());
 
+        // 스캔에 잡히지 않을 때 직접 연결
+        findViewById(R.id.btnDirectConnect).setOnClickListener(v -> {
+            tvStatus.setText("SmartScale-Setup에 직접 연결 중...");
+            doConnectToSmartScale("");
+        });
+
         // 앱 시작 시 자동 스캔
         checkPermissionAndScan();
 
