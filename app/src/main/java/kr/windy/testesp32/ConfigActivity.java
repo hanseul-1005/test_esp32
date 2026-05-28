@@ -1,11 +1,13 @@
 package kr.windy.testesp32;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -46,6 +48,13 @@ public class ConfigActivity extends AppCompatActivity {
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             int bottomInset = Math.max(systemBars.bottom, ime.bottom);
             v.setPadding(v.getPaddingLeft(), systemBars.top, v.getPaddingRight(), bottomInset);
+            if (ime.bottom > 0) {
+                View focused = v.findFocus();
+                if (focused != null) {
+                    v.post(() -> focused.requestRectangleOnScreen(
+                            new Rect(0, 0, focused.getWidth(), focused.getHeight()), false));
+                }
+            }
             return insets;
         });
 
