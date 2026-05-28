@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.widget.NestedScrollView;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -43,7 +44,9 @@ public class ConfigActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_config);
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.configRoot), (v, insets) -> {
+        NestedScrollView scrollView = findViewById(R.id.configRoot);
+
+        ViewCompat.setOnApplyWindowInsetsListener(scrollView, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             int bottomInset = Math.max(systemBars.bottom, ime.bottom);
@@ -62,12 +65,19 @@ public class ConfigActivity extends AppCompatActivity {
         tvConfigStatus = findViewById(R.id.tvConfigStatus);
         btnSave       = findViewById(R.id.btnSave);
 
-        // 포커스 시 키보드 애니메이션 완료 후 해당 입력창이 키보드 위로 오도록 스크롤
+        // 포커스 시 EditText 위치를 직접 계산해 키보드 바로 위로 스크롤
         View.OnFocusChangeListener scrollToFocused = (view, hasFocus) -> {
-            if (hasFocus) {
-                view.postDelayed(() -> view.requestRectangleOnScreen(
-                        new Rect(0, 0, view.getWidth(), view.getHeight()), false), 250);
-            }
+            if (!hasFocus) return;
+            scrollView.postDelayed(() -> {
+                Rect rect = new Rect();
+                view.getDrawingRect(rect);
+                scrollView.offsetDescendantRectToMyCoords(view, rect);
+                int visibleHeight = scrollView.getHeight() - scrollView.getPaddingBottom();
+                int targetScroll = rect.bottom - visibleHeight + dpToPx(8);
+                if (targetScroll > scrollView.getScrollY()) {
+                    scrollView.smoothScrollTo(0, targetScroll);
+                }
+            }, 350);
         };
         etSsid.setOnFocusChangeListener(scrollToFocused);
         etPassword.setOnFocusChangeListener(scrollToFocused);
@@ -91,6 +101,10 @@ public class ConfigActivity extends AppCompatActivity {
         });
 
         btnSave.setOnClickListener(v -> saveConfig());
+    }
+
+    private int dpToPx(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density);
     }
 
     private void showSsidPicker() {
