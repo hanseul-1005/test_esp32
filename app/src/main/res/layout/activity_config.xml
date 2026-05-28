@@ -99,6 +99,7 @@
             android:layout_width="match_parent"
             android:layout_height="42dp"
             android:inputType="textUri"
+            android:text="amenity.windygnt.myds.me"
             android:background="@drawable/input_border"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"/>
@@ -165,6 +166,7 @@
             android:layout_width="match_parent"
             android:layout_height="42dp"
             android:inputType="text"
+            android:text="windy"
             android:background="@drawable/input_border"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"/>
@@ -184,6 +186,7 @@
             android:layout_width="match_parent"
             android:layout_height="42dp"
             android:inputType="text"
+            android:text="!windy0136"
             android:background="@drawable/input_border"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"/>
