@@ -48,13 +48,6 @@ public class ConfigActivity extends AppCompatActivity {
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             int bottomInset = Math.max(systemBars.bottom, ime.bottom);
             v.setPadding(v.getPaddingLeft(), systemBars.top, v.getPaddingRight(), bottomInset);
-            if (ime.bottom > 0) {
-                View focused = v.findFocus();
-                if (focused != null) {
-                    v.post(() -> focused.requestRectangleOnScreen(
-                            new Rect(0, 0, focused.getWidth(), focused.getHeight()), false));
-                }
-            }
             return insets;
         });
 
@@ -68,6 +61,21 @@ public class ConfigActivity extends AppCompatActivity {
         cbShowPassword = findViewById(R.id.cbShowPassword);
         tvConfigStatus = findViewById(R.id.tvConfigStatus);
         btnSave       = findViewById(R.id.btnSave);
+
+        // 포커스 시 키보드 애니메이션 완료 후 해당 입력창이 키보드 위로 오도록 스크롤
+        View.OnFocusChangeListener scrollToFocused = (view, hasFocus) -> {
+            if (hasFocus) {
+                view.postDelayed(() -> view.requestRectangleOnScreen(
+                        new Rect(0, 0, view.getWidth(), view.getHeight()), false), 250);
+            }
+        };
+        etSsid.setOnFocusChangeListener(scrollToFocused);
+        etPassword.setOnFocusChangeListener(scrollToFocused);
+        etApiServer.setOnFocusChangeListener(scrollToFocused);
+        etApiPort.setOnFocusChangeListener(scrollToFocused);
+        etApiPath.setOnFocusChangeListener(scrollToFocused);
+        etDeviceCode.setOnFocusChangeListener(scrollToFocused);
+        etProductCode.setOnFocusChangeListener(scrollToFocused);
 
         ArrayList<String> received = getIntent().getStringArrayListExtra(EXTRA_SSID_LIST);
         if (received != null) ssidList = received;
