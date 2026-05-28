@@ -272,6 +272,7 @@ public class MainActivity extends AppCompatActivity {
 
                     Intent intent = new Intent(MainActivity.this, ConfigActivity.class);
                     intent.putStringArrayListExtra(ConfigActivity.EXTRA_SSID_LIST, ssidList);
+                    intent.putExtra(ConfigActivity.EXTRA_NETWORK, network);
                     startActivity(intent);
                 });
             }

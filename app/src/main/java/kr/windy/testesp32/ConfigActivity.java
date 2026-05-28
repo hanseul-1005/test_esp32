@@ -1,5 +1,6 @@
 package kr.windy.testesp32;
 
+import android.net.Network;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
@@ -15,6 +16,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -24,12 +26,14 @@ public class ConfigActivity extends AppCompatActivity {
 
     private static final String TAG = "ConfigActivity";
     public static final String EXTRA_SSID_LIST = "ssid_list";
+    public static final String EXTRA_NETWORK   = "esp32_network";
 
-    private EditText etSsid, etPassword, etApiIp, etApiPort, etApiPath, etDeviceCode, etProductCode;
+    private EditText etSsid, etPassword, etApiServer, etApiPort, etApiPath, etDeviceCode, etProductCode;
     private CheckBox cbShowPassword;
     private TextView tvConfigStatus;
     private Button btnSave;
     private ArrayList<String> ssidList = new ArrayList<>();
+    private Network esp32Network;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +48,7 @@ public class ConfigActivity extends AppCompatActivity {
 
         etSsid        = findViewById(R.id.etSsid);
         etPassword    = findViewById(R.id.etPassword);
-        etApiIp       = findViewById(R.id.etApiIp);
+        etApiServer   = findViewById(R.id.etApiIp);
         etApiPort     = findViewById(R.id.etApiPort);
         etApiPath     = findViewById(R.id.etApiPath);
         etDeviceCode  = findViewById(R.id.etDeviceCode);
@@ -53,14 +57,13 @@ public class ConfigActivity extends AppCompatActivity {
         tvConfigStatus = findViewById(R.id.tvConfigStatus);
         btnSave       = findViewById(R.id.btnSave);
 
-        // 주변 WiFi 목록 수신
         ArrayList<String> received = getIntent().getStringArrayListExtra(EXTRA_SSID_LIST);
         if (received != null) ssidList = received;
 
-        // SSID 목록 선택
+        esp32Network = getIntent().getParcelableExtra(EXTRA_NETWORK);
+
         findViewById(R.id.btnSelectSsid).setOnClickListener(v -> showSsidPicker());
 
-        // 비밀번호 표시 토글
         cbShowPassword.setOnCheckedChangeListener((btn, checked) -> {
             int type = checked
                     ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
@@ -86,13 +89,13 @@ public class ConfigActivity extends AppCompatActivity {
     }
 
     private void saveConfig() {
-        String ssid        = etSsid.getText().toString().trim();
-        String pass        = etPassword.getText().toString();
-        String apiIp       = etApiIp.getText().toString().trim();
-        String apiPort     = etApiPort.getText().toString().trim();
-        String apiPath     = etApiPath.getText().toString().trim();
-        String deviceCode  = etDeviceCode.getText().toString().trim();
-        String productCode = etProductCode.getText().toString().trim();
+        String ssid    = etSsid.getText().toString().trim();
+        String pass    = etPassword.getText().toString();
+        String server  = etApiServer.getText().toString().trim();
+        String port    = etApiPort.getText().toString().trim();
+        String path    = etApiPath.getText().toString().trim();
+        String code    = etDeviceCode.getText().toString().trim();
+        String product = etProductCode.getText().toString().trim();
 
         if (ssid.isEmpty()) {
             Toast.makeText(this, "SSID를 입력하세요", Toast.LENGTH_SHORT).show();
@@ -100,37 +103,48 @@ public class ConfigActivity extends AppCompatActivity {
         }
 
         btnSave.setEnabled(false);
-        tvConfigStatus.setText("저장 중...");
+        tvConfigStatus.setText("ESP32에 저장 중...");
 
         new Thread(() -> {
             try {
-                URL url = new URL("http://192.168.4.1/save");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                URL url = new URL("http://192.168.4.1/wifisave");
+
+                // Network.openConnection() 으로 ESP32 로컬 네트워크 강제 사용
+                HttpURLConnection conn = esp32Network != null
+                        ? (HttpURLConnection) esp32Network.openConnection(url)
+                        : (HttpURLConnection) url.openConnection();
+
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(5000);
                 conn.setReadTimeout(10000);
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
 
-                String body = "ssid="         + URLEncoder.encode(ssid,        "UTF-8")
-                        + "&pass="        + URLEncoder.encode(pass,        "UTF-8")
-                        + "&api_ip="      + URLEncoder.encode(apiIp,       "UTF-8")
-                        + "&api_port="    + URLEncoder.encode(apiPort,     "UTF-8")
-                        + "&api_path="    + URLEncoder.encode(apiPath,     "UTF-8")
-                        + "&device_code=" + URLEncoder.encode(deviceCode,  "UTF-8")
-                        + "&product_code="+ URLEncoder.encode(productCode, "UTF-8");
+                // 문서 기준 필드명: s, p, server, port, path, code, product
+                String body = "s="       + URLEncoder.encode(ssid,    "UTF-8")
+                        + "&p="       + URLEncoder.encode(pass,    "UTF-8")
+                        + "&server="  + URLEncoder.encode(server,  "UTF-8")
+                        + "&port="    + URLEncoder.encode(port,    "UTF-8")
+                        + "&path="    + URLEncoder.encode(path,    "UTF-8")
+                        + "&code="    + URLEncoder.encode(code,    "UTF-8")
+                        + "&product=" + URLEncoder.encode(product, "UTF-8");
 
-                conn.getOutputStream().write(body.getBytes("UTF-8"));
+                OutputStream os = conn.getOutputStream();
+                try {
+                    os.write(body.getBytes("UTF-8"));
+                } finally {
+                    os.close();
+                }
 
-                int code = conn.getResponseCode();
-                Log.d(TAG, "응답 코드: " + code);
+                int responseCode = conn.getResponseCode();
+                Log.d(TAG, "응답 코드: " + responseCode);
                 conn.disconnect();
 
                 runOnUiThread(() -> {
-                    if (code == 200) {
+                    if (responseCode == 200) {
                         tvConfigStatus.setText("저장 완료! ESP32가 재부팅됩니다.");
                     } else {
-                        tvConfigStatus.setText("저장 실패 (HTTP " + code + ")");
+                        tvConfigStatus.setText("저장 실패 (HTTP " + responseCode + ")");
                         btnSave.setEnabled(true);
                     }
                 });
